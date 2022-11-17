@@ -10,7 +10,6 @@ import com.microsoft.graph.requests.DriveItemCollectionPage;
 import com.microsoft.graph.requests.GraphServiceClient;
 import okhttp3.Request;
 
-import java.lang.Process;
 import java.lang.reflect.Type;
 import java.net.URI;
 import java.util.*;
@@ -18,10 +17,16 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 public class MicrosoftConnection {
-    private final Set<String> scope = new HashSet<>(Arrays.asList("user.read", "files.read.all", "offline_access"));
-    private static final String clientId = "";
+    private final Set<String> scope = new HashSet<>(Arrays.asList("user.read", "files.read.all", "offline_access", "sites.readwrite.all"));
+    private final String clientId;
+    private final String code;
     private String tokenCache;
     private IAuthenticationResult iAuthenticationResult;
+
+    public MicrosoftConnection(Properties properties){
+        this.clientId = properties.getProperty("microsoft.client.id");
+        this.code = properties.getProperty("microsoft.authorization.code");
+    }
 
     public void connection1() throws Exception {
         PublicClientApplication clientApplication = PublicClientApplication.builder(clientId).build();
@@ -44,9 +49,7 @@ public class MicrosoftConnection {
                 "&response_type=code" +
                 "&response_mode=fragment" +
                 "&prompt=select_account";
-        Process exec = Runtime.getRuntime().exec("rundll32 url.dll,FileProtocolHandler " + url);
         //Получение кода авторизации
-        String code = "0.ASEAcc68u3VFB0O9AMps1YAtIxvJDVAycOZEn6jFR8sNZL8hAKE.AgABAAIAAAD--DLA3VO7";
 
         PublicClientApplication clientApplication = PublicClientApplication.builder(clientId).build();
         AuthorizationCodeParameters parameters = AuthorizationCodeParameters
@@ -74,25 +77,6 @@ public class MicrosoftConnection {
 
         tokenCache = clientApplication.tokenCache().serialize();
         // tokenCache и iAuthenticationResult необходимо сохранить в БД
-    }
-
-    public void execute() {
-        String token = iAuthenticationResult.accessToken();
-        GraphServiceClient<Request> graphClient = GraphServiceClient.builder()
-                .authenticationProvider(requestUrl -> CompletableFuture.completedFuture(token))
-                .buildClient();
-        DriveItemCollectionPage driveItemCollectionPage = graphClient.me().drive().root().children().buildRequest().get();
-        for (DriveItem driveItem : driveItemCollectionPage.getCurrentPage()) {
-            if (null != driveItem.file && driveItem.name.equals("Book.xlsx")) {
-                List<WorkbookWorksheet> currentPage = graphClient.me().drive().items(driveItem.id).workbook().worksheets().buildRequest().get().getCurrentPage();
-                for (WorkbookWorksheet workbookWorksheet : currentPage) {
-                    WorkbookRange workbookRange = graphClient.me().drive().items(driveItem.id).workbook().worksheets(workbookWorksheet.id)
-                            .range().buildRequest(new FunctionOption("address", "A1:B3")).get();
-
-                    System.out.println(workbookRange.values);
-                }
-            }
-        }
     }
 
     public List<List<String>> getListTableRows() {

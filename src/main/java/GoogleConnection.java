@@ -16,21 +16,36 @@ import com.google.api.services.sheets.v4.SheetsScopes;
 
 import java.io.*;
 import java.security.GeneralSecurityException;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Date;
-import java.util.List;
+import java.util.*;
 
 public class GoogleConnection {
     private static final JsonFactory JSON_FACTORY = GsonFactory.getDefaultInstance();
     private static final List<String> SCOPES = Collections.singletonList(SheetsScopes.SPREADSHEETS_READONLY);
-    private static final String clientId = "";
-    private static final String clientSecret = "";
     private static final String redirectURI = "http://localhost";
+    private final String clientId;
+    private final String clientSecret;
+    private final String code;
     private DataStore<StoredCredential> credentialDataStore;
+
+    public GoogleConnection(Properties properties) {
+        this.clientId = properties.getProperty("google.client.id");
+        this.clientSecret = properties.getProperty("google.client.secret");
+        this.code = properties.getProperty("google.authorization.code");
+    }
 
     private Credential firstConnection() throws IOException, GeneralSecurityException {
         final NetHttpTransport HTTP_TRANSPORT = GoogleNetHttpTransport.newTrustedTransport();
+
+        String url = "https://accounts.google.com/o/oauth2/auth/oauthchooseaccount?" +
+                "redirect_uri=http://localhost" +
+                "&scope=https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fspreadsheets%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fdrive%20openid" +
+                "&response_type=code" +
+                "&approval_prompt=force" +
+                "&access_type=offline" +
+                "&client_id=" + clientId +
+                "&service=lso&o2v=1&flowName=GeneralOAuthFlow";
+        //Получение кода авторизации
+
         GoogleClientSecrets.Details details = new GoogleClientSecrets.Details()
                 .setClientId(clientId)
                 .setClientSecret(clientSecret)
@@ -44,7 +59,7 @@ public class GoogleConnection {
                 .setAccessType("offline").build();
 
         TokenResponse tokenResponse = flow
-                .newTokenRequest("4/0AfgeXvuJ8NFmYnLnQbOcIll07NlE4WvAPrZeMYSfIhobYMBWvEwZp2Us2nVhove4dKfHFg")
+                .newTokenRequest(code)
                 .setRedirectUri(redirectURI).execute();
         Credential credential = flow.createAndStoreCredential(tokenResponse, "user_id");
         credentialDataStore = flow.getCredentialDataStore();
