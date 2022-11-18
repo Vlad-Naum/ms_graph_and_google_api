@@ -53,6 +53,19 @@ public class Main {
         // tokenCache и iAuthenticationResult необходимо сохранить в БД, еще upn для отображения в профиле подключения
     }
 
+    // Получение расположения (пока только oneDrive)
+    public List<Drive> getDrives(Properties property) throws Exception {
+        Microsoft365Service service = new Microsoft365Service(property);
+        GraphServiceClient<Request> graphClient = service.getMicrosoftGraphClient(iAuthenticationResult, tokenCache);
+
+        DriveCollectionPage driveCollectionPage = graphClient.me().drives().buildRequest().get();
+        if (driveCollectionPage != null) {
+            return driveCollectionPage.getCurrentPage();
+        }
+        return new ArrayList<>();
+    }
+
+    // Получение файлов с oneDrive
     public List<DriveItem> getMicrosoftDriveItem(String driveItemId, Properties property) throws Exception {
         Microsoft365Service service = new Microsoft365Service(property);
         GraphServiceClient<Request> graphClient = service.getMicrosoftGraphClient(iAuthenticationResult, tokenCache);
@@ -67,6 +80,7 @@ public class Main {
         return new ArrayList<>();
     }
 
+    // Получение файлов с "Общий доступ"
     public List<DriveItem> getMicrosoftSharedDriveItem(Properties property) throws Exception {
         Microsoft365Service service = new Microsoft365Service(property);
         GraphServiceClient<Request> graphClient = service.getMicrosoftGraphClient(iAuthenticationResult, tokenCache);
@@ -81,6 +95,7 @@ public class Main {
         return new ArrayList<>();
     }
 
+    // Получение листов из .xlsx документа
     public List<WorkbookWorksheet> getWorkbookWorksheets(String driveItemId, Properties property) throws Exception {
         Microsoft365Service service = new Microsoft365Service(property);
         GraphServiceClient<Request> graphClient = service.getMicrosoftGraphClient(iAuthenticationResult, tokenCache);
@@ -92,6 +107,7 @@ public class Main {
         return new ArrayList<>();
     }
 
+    // Получение таблиц
     public List<WorkbookTable> getWorkbookTable(String driveItemId, String workSheetId, Properties property) throws Exception {
         Microsoft365Service service = new Microsoft365Service(property);
         GraphServiceClient<Request> graphClient = service.getMicrosoftGraphClient(iAuthenticationResult, tokenCache);
@@ -104,6 +120,7 @@ public class Main {
         return new ArrayList<>();
     }
 
+    // Получение колонок
     public List<WorkbookTableColumn> getTableColumn(String driveItemId, String workSheetId, String tableId, Properties property) throws Exception {
         Microsoft365Service service = new Microsoft365Service(property);
         GraphServiceClient<Request> graphClient = service.getMicrosoftGraphClient(iAuthenticationResult, tokenCache);
@@ -116,6 +133,7 @@ public class Main {
         return new ArrayList<>();
     }
 
+    // Получение строк с листа
     public List<List<String>> getListWorkSheetRows(String driveItemId, String workSheetId, String range, Properties property) throws Exception {
         Microsoft365Service service = new Microsoft365Service(property);
         GraphServiceClient<Request> graphClient = service.getMicrosoftGraphClient(iAuthenticationResult, tokenCache);
@@ -140,6 +158,7 @@ public class Main {
         return resultWorkSheetRow;
     }
 
+    // Получение строк из таблицы
     public List<List<String>> getTableWorkSheetRows(String driveItemId, String workSheetId, String tableId, String columnId, Properties property) throws Exception {
         Microsoft365Service service = new Microsoft365Service(property);
         GraphServiceClient<Request> graphClient = service.getMicrosoftGraphClient(iAuthenticationResult, tokenCache);
@@ -150,7 +169,7 @@ public class Main {
                     .tables(tableId).columns(columnId).buildRequest().get();
             if (workbookTableColumn != null && workbookTableColumn.values != null) {
                 JsonArray jsonArray = workbookTableColumn.values.getAsJsonArray();
-                // Под нулевым индексом хранится заголовок колонки
+                // Под нулевым индексом хранится заголовок колонки, он нам не нужен
                 jsonArray.remove(0);
                 Type collectionType = new TypeToken<Collection<List<String>>>() {}.getType();
                 Collection<List<String>> list = new Gson().fromJson(jsonArray, collectionType);
