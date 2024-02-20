@@ -6,25 +6,35 @@ import com.microsoft.aad.msal4j.Prompt;
 import com.microsoft.aad.msal4j.PublicClientApplication;
 import com.microsoft.graph.models.*;
 import com.microsoft.graph.options.FunctionOption;
-import com.microsoft.graph.requests.DriveItemCollectionPage;
-import com.microsoft.graph.requests.GraphServiceClient;
+import com.microsoft.graph.requests.*;
 import okhttp3.Request;
 
+import java.io.InputStream;
 import java.lang.reflect.Type;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.*;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 public class MicrosoftConnection {
-    private final Set<String> scope = new HashSet<>(Arrays.asList("user.read", "files.read.all", "offline_access", "sites.readwrite.all"));
+    private final Set<String> scope = new HashSet<>(Arrays.asList("user.read", "files.read.all", "offline_access", "sites.readwrite.all",
+            "ChatMessage.Read", "Files.ReadWrite.All", "Chat.ReadWrite"));
     private final String clientId;
+    private final String clientSecret;
+    private final String tenant;
+    private final Set<String> scope2 = new HashSet<>(Arrays.asList(".default"));
     private final String code;
     private String tokenCache;
     private IAuthenticationResult iAuthenticationResult;
 
     public MicrosoftConnection(Properties properties){
         this.clientId = properties.getProperty("microsoft.client.id");
+        this.clientSecret = properties.getProperty("microsoft.client.secret");
+        this.tenant = properties.getProperty("microsoft.tenant");
         this.code = properties.getProperty("microsoft.authorization.code");
     }
 
@@ -60,6 +70,27 @@ public class MicrosoftConnection {
         iAuthenticationResult = clientApplication.acquireToken(parameters).get();
         tokenCache = clientApplication.tokenCache().serialize();
         // tokenCache и iAuthenticationResult необходимо сохранить в БД
+    }
+
+    public void connection3() throws Exception {
+        ConfidentialClientApplication clientApplication = ConfidentialClientApplication.builder(clientId,
+                ClientCredentialFactory.createFromSecret(clientSecret))
+                .build();
+        ClientCredentialParameters parameters = ClientCredentialParameters.builder(scope2)
+                .tenant(tenant)
+                .build();
+        iAuthenticationResult = clientApplication.acquireToken(parameters).get();
+        tokenCache = clientApplication.tokenCache().serialize();
+    }
+
+    public void connection4() throws Exception {
+        PublicClientApplication clientApplication = PublicClientApplication.builder(clientId).build();
+        UserNamePasswordParameters parameters = UserNamePasswordParameters
+                .builder(scope, "username@mail.com", "password".toCharArray())
+                .tenant(tenant)
+                .build();
+        iAuthenticationResult = clientApplication.acquireToken(parameters).get();
+        tokenCache = clientApplication.tokenCache().serialize();
     }
 
     public void reloadToken() throws Exception {
@@ -125,6 +156,36 @@ public class MicrosoftConnection {
             }
         }
         return resultWorkSheetRow;
+    }
+
+    public void getVideo() {
+        String token = iAuthenticationResult.accessToken();
+        GraphServiceClient<Request> graphClient = GraphServiceClient.builder()
+                .authenticationProvider(requestUrl -> CompletableFuture.completedFuture(token))
+                .buildClient();
+
+        String meetingId = "19:meeting_NGY2NzFiMmMtOGU4My00NGI5LTkwYzItNDJlMzRlZmNkYWZl@thread.v2";
+        ChatMessageCollectionPage page = graphClient.me().chats(meetingId).messages().buildRequest().get();
+//        ChatMessageCollectionPage page = graphClient.chats(meetingId).messages()
+//                .buildRequest(new Option[]{new QueryOption("top", 10)}).get();
+        ChatMessageCollectionRequestBuilder nextPage = page.getNextPage();
+        for (ChatMessage chatMessage : page.getCurrentPage()) {
+            if (chatMessage.eventDetail instanceof CallRecordingEventMessageDetail) {
+                CallRecordingEventMessageDetail callRecording = (CallRecordingEventMessageDetail) chatMessage.eventDetail;
+                if (callRecording.callRecordingStatus == CallRecordingStatus.SUCCESS) {
+                    String callRecordingUrl = callRecording.callRecordingUrl;
+                    String base64 = Base64.getUrlEncoder().encodeToString(callRecordingUrl.getBytes(StandardCharsets.UTF_8));
+                    String encode = "u!" + base64.replaceAll("/", "_").replaceAll("/+", "-");
+                    try {
+                        InputStream inputStream1 = graphClient.shares(encode).driveItem().content().buildRequest().get();
+                        Files.copy(inputStream1, Paths.get("C:\\" + callRecording.callRecordingDisplayName), StandardCopyOption.REPLACE_EXISTING);
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+        }
+//        OnlineMeetingCollectionPage onlineMeetingCollectionPage = graphClient.me().onlineMeetings().buildRequest().filter(String.format("joinWebUrl eq '%s'", "https://teams.microsoft.com/l/meetup-join/19%3ameeting_NGY2NzFiMmMtOGU4My00NGI5LTkwYz.v2/0")).get();
     }
 }
 
